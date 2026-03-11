@@ -1,0 +1,164 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Expected:
+ * $person = associative array with person data
+ */
+
+function hasValue(mixed $value): bool
+{
+    return $value !== null && $value !== '';
+}
+
+function renderValueRow(string $label, mixed $value): void
+{
+    if (!hasValue($value)) {
+        return;
+    }
+    ?>
+    <div class="row py-2 border-bottom">
+        <div class="col-sm-4 fw-semibold"><?= htmlspecialchars($label) ?></div>
+        <div class="col-sm-8"><?= nl2br(htmlspecialchars((string)$value)) ?></div>
+    </div>
+    <?php
+}
+
+function normalizeUrl(?string $value): ?string
+{
+    if (!hasValue($value)) {
+        return null;
+    }
+
+    $value = trim((string)$value);
+
+    if (preg_match('~^https?://~i', $value)) {
+        return $value;
+    }
+
+    return 'https://' . $value;
+}
+
+function renderContactIconLink(string $iconClass, ?string $href, ?string $title = null): void
+{
+    if (!hasValue($href)) {
+        return;
+    }
+    ?>
+    <a
+        href="<?= htmlspecialchars((string)$href) ?>"
+        class="btn btn-outline-secondary btn-sm me-2 mb-2"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="<?= htmlspecialchars((string)($title ?? 'Open link')) ?>"
+    >
+        <i class="<?= htmlspecialchars($iconClass) ?>"></i>
+    </a>
+    <?php
+}
+
+$photoUrl = null;
+if (!empty($person['foto_url'])) {
+    $photoUrl = normalizeUrl((string)$person['foto_url']);
+}
+?>
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h4 class="mb-0">Persoongegevens</h4>
+    </div>
+
+    <div class="card-body">
+        <div class="row g-4">
+            <div class="col-md-4 col-lg-3">
+                <div class="text-center">
+                    <?php if ($photoUrl): ?>
+                        <img
+                            src="<?= htmlspecialchars($photoUrl) ?>"
+                            alt="Foto van <?= htmlspecialchars((string)($person['roepnaam'] ?? 'persoon')) ?>"
+                            class="img-fluid rounded shadow-sm border"
+                            style="max-height: 320px; object-fit: cover;"
+                        >
+                    <?php else: ?>
+                        <div class="border rounded bg-light d-flex align-items-center justify-content-center shadow-sm"
+                             style="height: 320px;">
+                            <div class="text-muted text-center">
+                                <i class="fa-solid fa-user fa-3x mb-3"></i>
+                                <div>Geen foto beschikbaar</div>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="col-md-8 col-lg-9">
+                <div class="card border-0 bg-light">
+                    <div class="card-body">
+                        <?php renderValueRow('Nummer', $person['nummer'] ?? null); ?>
+                        <?php renderValueRow('Roepnaam', $person['roepnaam'] ?? null); ?>
+                        <?php renderValueRow('Voornamen', $person['voornamen'] ?? null); ?>
+                        <?php renderValueRow('Achternaam', $person['achternaam'] ?? null); ?>
+                        <?php renderValueRow('Geslacht', $person['geslacht'] ?? null); ?>
+                        <?php renderValueRow('Geboortedatum', formatDateValue($person['geboortedatum']) ?? null); ?>
+                        <?php renderValueRow('Geboorteplaats', $person['geboorteplaats'] ?? null); ?>
+                        <?php renderValueRow('Overlijdensdatum', $person['overlijdensdatum'] ?? null); ?>
+                        <?php renderValueRow('Overlijdensplaats', $person['overlijdensplaats'] ?? null); ?>
+                        <?php renderValueRow('Titel', $person['titel'] ?? null); ?>
+                        <?php renderValueRow('Functie', $person['functie'] ?? null); ?>
+                        <?php renderValueRow('Partij', $person['partij'] ?? null); ?>
+                        <?php renderValueRow('Biografie', $person['biografie'] ?? null); ?>
+                        
+                        <?php renderValueRow('Contact & Social Media', $person['functie'] ?? null); ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <hr class="my-4">
+
+        <div class="card border-0 bg-light">
+            <div class="card-header bg-transparent">
+                <h5 class="mb-0">Contact & Social Media</h5>
+            </div>
+            <div class="card-body">
+                <?php if (
+                    !hasValue($person['email'] ?? null) &&
+                    !hasValue($person['website'] ?? null) &&
+                    !hasValue($person['linkedin'] ?? null) &&
+                    !hasValue($person['twitter'] ?? null) &&
+                    !hasValue($person['facebook'] ?? null) &&
+                    !hasValue($person['instagram'] ?? null) &&
+                    !hasValue($person['youtube'] ?? null) &&
+                    !hasValue($person['tiktok'] ?? null)
+                ): ?>
+                    <div class="text-muted">Geen contactinformatie beschikbaar.</div>
+                <?php else: ?>
+                    <div class="d-flex flex-wrap align-items-center">
+                        <?php if (!empty($person['email'])): ?>
+                            <a
+                                href="mailto:<?= htmlspecialchars((string)$person['email']) ?>"
+                                class="btn btn-outline-secondary btn-sm me-2 mb-2"
+                                title="E-mail"
+                            >
+                                <i class="fa-solid fa-envelope"></i>
+                            </a>
+                        <?php endif; ?>
+
+                        <?php renderContactIconLink('fa-solid fa-globe', normalizeUrl($person['website'] ?? null), 'Website'); ?>
+                        <?php renderContactIconLink('fa-brands fa-linkedin', normalizeUrl($person['linkedin'] ?? null), 'LinkedIn'); ?>
+                        <?php renderContactIconLink('fa-brands fa-x-twitter', normalizeUrl($person['twitter'] ?? null), 'X / Twitter'); ?>
+                        <?php renderContactIconLink('fa-brands fa-facebook', normalizeUrl($person['facebook'] ?? null), 'Facebook'); ?>
+                        <?php renderContactIconLink('fa-brands fa-instagram', normalizeUrl($person['instagram'] ?? null), 'Instagram'); ?>
+                        <?php renderContactIconLink('fa-brands fa-youtube', normalizeUrl($person['youtube'] ?? null), 'YouTube'); ?>
+                        <?php renderContactIconLink('fa-brands fa-tiktok', normalizeUrl($person['tiktok'] ?? null), 'TikTok'); ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <a href="index.php?tab=person" class="btn btn-outline-primary">
+                <i class="fa-solid fa-arrow-left"></i> Terug naar overzicht
+            </a>
+        </div>
+    </div>
+</div>
