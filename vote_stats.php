@@ -53,7 +53,7 @@ $fractieQueries = [
             s.anders_stemmen,
             s.voor_percentage,
             s.tegen_percentage
-        FROM fractie_stem_stats s
+        FROM fractie_stats s
         INNER JOIN fractie f
             ON f.id = s.fractie_id
         WHERE (f.is_verwijderd = 0 OR f.is_verwijderd IS NULL)
@@ -69,7 +69,7 @@ $fractieQueries = [
             s.anders_stemmen,
             s.voor_percentage,
             s.tegen_percentage
-        FROM fractie_stem_stats s
+        FROM fractie_stats s
         INNER JOIN fractie f
             ON f.id = s.fractie_id
         WHERE (f.is_verwijderd = 0 OR f.is_verwijderd IS NULL)
@@ -85,7 +85,7 @@ $fractieQueries = [
             s.anders_stemmen,
             s.voor_percentage,
             s.tegen_percentage
-        FROM fractie_stem_stats s
+        FROM fractie_stats s
         INNER JOIN fractie f
             ON f.id = s.fractie_id
         WHERE (f.is_verwijderd = 0 OR f.is_verwijderd IS NULL)
@@ -101,7 +101,7 @@ $fractieQueries = [
             s.anders_stemmen,
             s.voor_percentage,
             s.tegen_percentage
-        FROM fractie_stem_stats s
+        FROM fractie_stats s
         INNER JOIN fractie f
             ON f.id = s.fractie_id
         WHERE (f.is_verwijderd = 0 OR f.is_verwijderd IS NULL)
@@ -117,7 +117,7 @@ $fractieQueries = [
             s.anders_stemmen,
             s.voor_percentage,
             s.tegen_percentage
-        FROM fractie_stem_stats s
+        FROM fractie_stats s
         INNER JOIN fractie f
             ON f.id = s.fractie_id
         WHERE (f.is_verwijderd = 0 OR f.is_verwijderd IS NULL)
@@ -134,7 +134,7 @@ $fractieQueries = [
             s.anders_stemmen,
             s.voor_percentage,
             s.tegen_percentage
-        FROM fractie_stem_stats s
+        FROM fractie_stats s
         INNER JOIN fractie f
             ON f.id = s.fractie_id
         WHERE (f.is_verwijderd = 0 OR f.is_verwijderd IS NULL)

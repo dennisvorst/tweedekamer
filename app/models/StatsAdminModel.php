@@ -58,7 +58,7 @@ class StatsAdminModel
     public function createFractieStatsTable(): void
     {
         $sql = "
-            CREATE TABLE IF NOT EXISTS fractie_stem_stats (
+            CREATE TABLE IF NOT EXISTS fractie_stats (
                 fractie_id VARCHAR(36) NOT NULL PRIMARY KEY,
                 totaal_stemmen INT NOT NULL DEFAULT 0,
                 voor_stemmen INT NOT NULL DEFAULT 0,
@@ -73,12 +73,12 @@ class StatsAdminModel
 
         $this->pdo->exec($sql);
 
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_totaal ON fractie_stem_stats (totaal_stemmen)");
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_voor ON fractie_stem_stats (voor_stemmen)");
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_tegen ON fractie_stem_stats (tegen_stemmen)");
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_anders ON fractie_stem_stats (anders_stemmen)");
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_voor_pct ON fractie_stem_stats (voor_percentage)");
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_tegen_pct ON fractie_stem_stats (tegen_percentage)");
+        $this->pdo->exec("CREATE INDEX idx_fractie_stats_totaal ON fractie_stats (totaal_stemmen)");
+        $this->pdo->exec("CREATE INDEX idx_fractie_stats_voor ON fractie_stats (voor_stemmen)");
+        $this->pdo->exec("CREATE INDEX idx_fractie_stats_tegen ON fractie_stats (tegen_stemmen)");
+        $this->pdo->exec("CREATE INDEX idx_fractie_stats_anders ON fractie_stats (anders_stemmen)");
+        $this->pdo->exec("CREATE INDEX idx_fractie_stats_voor_pct ON fractie_stats (voor_percentage)");
+        $this->pdo->exec("CREATE INDEX idx_fractie_stats_tegen_pct ON fractie_stats (tegen_percentage)");
     }
 
     public function getAllPersoonIds(): array
@@ -294,7 +294,7 @@ class StatsAdminModel
     public function rebuildFractieStat(string $fractieId): void
     {
         $sql = "
-            INSERT INTO fractie_stem_stats (
+            INSERT INTO fractie_stats (
                 fractie_id,
                 totaal_stemmen,
                 voor_stemmen,
