@@ -58,6 +58,16 @@ class ActiviteitApi
         return $this->activiteitModel->getActiviteitAgendapuntRows($activiteitId);
     }
 
+    public function getAgendapuntDetails(string $id): ?array
+    {
+        return $this->activiteitModel->getAgendapuntDetails($id);
+    }
+
+    public function getAgendapuntBesluitRows(string $id): array
+    {
+        return $this->activiteitModel->getAgendapuntBesluitRows($id);
+    }
+
     public function getActiviteitSoorten(): array
     {
         return $this->activiteitModel->getActiviteitSoorten();

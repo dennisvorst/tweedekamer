@@ -13,430 +13,268 @@ require_once __DIR__ . '/app/api/ActiviteitApi.php';
 require_once __DIR__ . '/app/models/ActiviteitModel.php';
 require_once __DIR__ . '/app/api/ZaakApi.php';
 require_once __DIR__ . '/app/models/ZaakModel.php';
-
-use App\Config\Database;
-use App\Models\ListStateModel;
+require_once __DIR__ . '/app/api/StatsApi.php';
+require_once __DIR__ . '/app/models/StatsModel.php';
 
 use App\Api\ActiviteitApi;
-use App\Models\ActiviteitModel;
 use App\Api\FractieApi;
-use App\Models\FractieModel;
 use App\Api\PersonApi;
-use App\Models\PersonModel;
+use App\Api\StatsApi;
 use App\Api\ZaakApi;
-use App\Models\ZaakModel;
 use App\Api\ZaalApi;
+use App\Config\Database;
+use App\Models\ActiviteitModel;
+use App\Models\FractieModel;
+use App\Models\ListStateModel;
+use App\Models\PersonModel;
+use App\Models\StatsModel;
+use App\Models\ZaakModel;
 use App\Models\ZaalModel;
 
-
-/*
- * Determine active tab
+/**
+ * Loads list data in a generic way and keeps stored page state in range.
  */
-$activeTab = $_GET['tab'] ?? 'activiteit';
+function loadTabDataset(array $tab, int $perPage): array
+{
+    $stateData = $tab['stateData'];
+    $sort = (string)($stateData['sort'] ?? $tab['defaults']['sort']);
+    $direction = (string)($stateData['direction'] ?? $tab['defaults']['direction']);
+    $page = max(1, (int)($stateData['page'] ?? 1));
+    $filters = is_array($stateData['filters'] ?? null) ? $stateData['filters'] : [];
 
-if (!in_array($activeTab, ['activiteit', 'fractie', 'person', 'zaal', 'zaak'], true)) {
-    $activeTab = 'activiteit';
+    $fetch = $tab['fetch'];
+    $result = $fetch($tab['api'], $filters, $sort, $direction, $page, $perPage);
+
+    $records = is_array($result['data'] ?? null) ? $result['data'] : [];
+    $total = (int)($result['total'] ?? 0);
+    $totalPages = (int)ceil($total / $perPage);
+    $currentPage = min($page, max(1, $totalPages > 0 ? $totalPages : 1));
+
+    if ($currentPage !== $page) {
+        $stateData['page'] = $currentPage;
+        $tab['stateManager']->saveState($stateData);
+
+        $result = $fetch($tab['api'], $filters, $sort, $direction, $currentPage, $perPage);
+        $records = is_array($result['data'] ?? null) ? $result['data'] : [];
+    }
+
+    $extras = [];
+    if (isset($tab['loadExtras'])) {
+        $loadExtras = $tab['loadExtras'];
+        $extras = $loadExtras($tab['api']);
+    }
+
+    return [
+        'sort' => $sort,
+        'direction' => $direction,
+        'page' => $page,
+        'currentPage' => $currentPage,
+        'filters' => $filters,
+        'records' => $records,
+        'total' => $total,
+        'totalPages' => $totalPages,
+        'extras' => $extras,
+    ];
 }
-
-/*
- * Create shared database connection
- */
 
 $pdo = Database::createConnection();
 
-$activiteitModel = new ActiviteitModel($pdo);
-$fractieModel = new FractieModel($pdo);
-$personModel = new PersonModel($pdo);
-$zaalModel   = new ZaalModel($pdo);
-$zaakModel   = new ZaakModel($pdo);
+$tabs = [
+    'activiteit' => [
+        'label' => 'Activiteit',
+        'defaults' => ActiviteitModel::getListDefaults(),
+        'allowedFilters' => ActiviteitModel::getAllowedFilters(),
+        'stateManager' => new ListStateModel('activiteit'),
+        'api' => new ActiviteitApi(new ActiviteitModel($pdo)),
+        'fetch' => static fn(ActiviteitApi $api, array $filters, string $sort, string $direction, int $page, int $perPage): array
+            => $api->getActiviteiten($filters, $sort, $direction, $page, $perPage),
+        'loadExtras' => static fn(ActiviteitApi $api): array
+            => ['activiteitSoorten' => $api->getActiviteitSoorten()],
+        'recordsVar' => 'activiteiten',
+        'view' => __DIR__ . '/app/views/Activiteit/listview.php',
+    ],
+    'fractie' => [
+        'label' => 'Fractie',
+        'defaults' => FractieModel::getListDefaults(),
+        'allowedFilters' => FractieModel::getAllowedFilters(),
+        'stateManager' => new ListStateModel('fractie'),
+        'api' => new FractieApi(new FractieModel($pdo)),
+        'fetch' => static fn(FractieApi $api, array $filters, string $sort, string $direction, int $page, int $perPage): array
+            => $api->getFracties($filters, $sort, $direction, $page, $perPage),
+        'recordsVar' => 'fracties',
+        'view' => __DIR__ . '/app/views/Fractie/listview.php',
+    ],
+    'person' => [
+        'label' => 'Persoon',
+        'defaults' => PersonModel::getListDefaults(),
+        'allowedFilters' => PersonModel::getAllowedFilters(),
+        'stateManager' => new ListStateModel('person'),
+        'api' => new PersonApi(new PersonModel($pdo)),
+        'fetch' => static fn(PersonApi $api, array $filters, string $sort, string $direction, int $page, int $perPage): array
+            => $api->getPersons($filters, $sort, $direction, $page, $perPage),
+        'recordsVar' => 'persons',
+        'view' => __DIR__ . '/app/views/Persoon/ListView.php',
+    ],
+    'zaal' => [
+        'label' => 'Zaal',
+        'defaults' => ZaalModel::getListDefaults(),
+        'allowedFilters' => ZaalModel::getAllowedFilters(),
+        'stateManager' => new ListStateModel('zaal'),
+        'api' => new ZaalApi(new ZaalModel($pdo)),
+        'fetch' => static fn(ZaalApi $api, array $filters, string $sort, string $direction, int $page, int $perPage): array
+            => $api->getZalen($filters, $sort, $direction, $page, $perPage),
+        'recordsVar' => 'zalen',
+        'view' => __DIR__ . '/app/views/Zaal/ListView.php',
+    ],
+    'zaak' => [
+        'label' => 'Zaak',
+        'defaults' => ZaakModel::getListDefaults(),
+        'allowedFilters' => ZaakModel::getAllowedFilters(),
+        'stateManager' => new ListStateModel('zaak'),
+        'api' => new ZaakApi(new ZaakModel($pdo)),
+        'fetch' => static fn(ZaakApi $api, array $filters, string $sort, string $direction, int $page, int $perPage): array
+            => $api->getZaken($filters, $sort, $direction, $page, $perPage),
+        'loadExtras' => static fn(ZaakApi $api): array
+            => ['zaakSoorten' => $api->getZaakSoorten()],
+        'recordsVar' => 'zaken',
+        'view' => __DIR__ . '/app/views/Zaak/listview.php',
+    ],
+    'statistiek' => [
+        'label' => 'Statistieken',
+        'defaults' => [
+            'sort' => '',
+            'direction' => 'asc',
+            'page' => 1,
+            'filters' => [],
+        ],
+        'allowedFilters' => [],
+        'stateManager' => new ListStateModel('statistiek'),
+        'api' => new StatsApi(new StatsModel($pdo)),
+        'fetch' => static fn(StatsApi $api, array $filters, string $sort, string $direction, int $page, int $perPage): array
+            => ['data' => [], 'total' => 0],
+        'loadExtras' => static function (StatsApi $api): array {
+            $statsSection = (string)($_GET['stats_section'] ?? 'active_persons');
+            $statsSort = (string)($_GET['stats_sort'] ?? 'jaren_ervaring');
+            $statsDirection = (string)($_GET['stats_direction'] ?? 'desc');
 
-$activiteitApi   = new ActiviteitApi($activiteitModel);
-$fractieApi   = new FractieApi($fractieModel);
-$personApi = new PersonApi($personModel);
-$zaalApi   = new ZaalApi($zaalModel);
-$zaakApi   = new ZaakApi($zaakModel);
+            $defaultSorts = [
+                'active_persons' => 'jaren_ervaring',
+                'experience_map' => 'jaren_ervaring',
+                'persons' => 'totaal_stemmen',
+                'fracties' => 'totaal_stemmen',
+                'besluiten' => 'totaal_stemmen',
+            ];
 
-$activiteitStateManager = new ListStateModel('activiteit');
-$fractieStateManager = new ListStateModel('fractie');
-$personStateManager = new ListStateModel('person');
-$zaalStateManager   = new ListStateModel('zaal');
-$zaakStateManager   = new ListStateModel('zaak');
+            if (!array_key_exists($statsSection, $defaultSorts)) {
+                $statsSection = 'active_persons';
+            }
 
-/** defaults */
-$activiteitDefaults = [
-    'sort' => 'datum',
-    'direction' => 'desc',
-    'page' => 1,
-    'filters' => [
-        'soort' => '',
-        'nummer' => '',
-        'onderwerp' => '',
-        'datum' => '',
-        'locatie' => '',
+            if ($statsSort === '') {
+                $statsSort = $defaultSorts[$statsSection];
+            }
+
+            if (!in_array(strtolower($statsDirection), ['asc', 'desc'], true)) {
+                $statsDirection = 'desc';
+            }
+
+            return [
+                'statsSection' => $statsSection,
+                'statsSort' => $statsSort,
+                'statsDirection' => $statsDirection,
+                'activePersonStats' => $api->getActivePersonStats(
+                    in_array($statsSection, ['active_persons', 'experience_map'], true) ? $statsSort : 'jaren_ervaring',
+                    in_array($statsSection, ['active_persons', 'experience_map'], true) ? $statsDirection : 'desc'
+                ),
+                'personStatsList' => $api->getPersonStatsList(
+                    $statsSection === 'persons' ? $statsSort : 'totaal_stemmen',
+                    $statsSection === 'persons' ? $statsDirection : 'desc'
+                ),
+                'fractieStatsList' => $api->getFractieStatsList(
+                    $statsSection === 'fracties' ? $statsSort : 'totaal_stemmen',
+                    $statsSection === 'fracties' ? $statsDirection : 'desc'
+                ),
+                'besluitStatsList' => $api->getBesluitStatsList(
+                    $statsSection === 'besluiten' ? $statsSort : 'totaal_stemmen',
+                    $statsSection === 'besluiten' ? $statsDirection : 'desc'
+                ),
+            ];
+        },
+        'recordsVar' => 'statsRows',
+        'view' => __DIR__ . '/app/views/Statistiek/listview.php',
     ],
 ];
 
-$fractieDefaults = [
-    'sort' => 'naam_nl',
-    'direction' => 'asc',
-    'page' => 1,
-    'filters' => [
-        'nummer' => '',
-        'afkorting' => '',
-        'naam_nl' => '',
-        'naam_en' => '',
-        'aantal_zetels' => '',
-        'aantal_stemmen' => '',
-        'datum_actief' => '',
-        'datum_inactief' => '',
-    ],
-];
+$activeTab = $_GET['tab'] ?? 'activiteit';
+if (!isset($tabs[$activeTab])) {
+    $activeTab = 'activiteit';
+}
 
-$personDefaults = [
-    'sort' => 'achternaam',
-    'direction' => 'asc',
-    'page' => 1,
-    'filters' => [
-        'nummer' => '',
-        'roepnaam' => '',
-        'achternaam' => '',
-        'geboortedatum' => '',
-        'geslacht' => '',
-    ],
-];
+$request = $_GET;
+$resetRequested = isset($request['reset']) && (string)$request['reset'] === '1';
 
-$zaakDefaults = [
-    'sort' => 'gestart_op',
-    'direction' => 'desc',
-    'page' => 1,
-    'filters' => [
-        'nummer' => '',
-        'soort' => '',
-        'titel' => '',
-        'status' => '',
-        'onderwerp' => '',
-        'gestart_op' => '',
-        'organisatie' => '',
-        'vergaderjaar' => '',
-        'afgedaan' => '',
-        'groot_project' => '',
-    ],
-];
+if ($activeTab === 'person') {
+    $personMode = (string)($request['person_view'] ?? '');
 
-$zaalDefaults = [
-    'sort' => 'naam',
-    'direction' => 'asc',
-    'page' => 1,
-    'filters' => [
-        'id' => '',
-        'naam' => '',
-        'syscode' => '',
-    ],
-];
-
-/** filters */
-$activiteitAllowedFilters = [
-    'soort',
-    'nummer',
-    'onderwerp',
-    'datum',
-    'locatie',
-];
-$fractieAllowedFilters = [
-    'nummer',
-    'afkorting',
-    'naam_nl',
-    'naam_en',
-    'aantal_zetels',
-    'aantal_stemmen',
-    'datum_actief',
-    'datum_inactief',
-];
-$personAllowedFilters = ['nummer', 'roepnaam', 'achternaam', 'geboortedatum', 'geslacht'];
-$zaakAllowedFilters = [
-    'nummer',
-    'soort',
-    'titel',
-    'status',
-    'onderwerp',
-    'gestart_op',
-    'organisatie',
-    'vergaderjaar',
-    'afgedaan',
-    'groot_project',
-];
-$zaalAllowedFilters   = ['id', 'naam', 'syscode'];
-
-// if ($activeTab === 'person') {
-//     if (isset($_GET['reset']) && (string)$_GET['reset'] === '1') {
-//         $personState = $personStateManager->reset($personDefaults);
-//     } else {
-//         $personState = $personStateManager->applyRequest($_GET, $personDefaults, $personAllowedFilters);
-//     }
-
-//     $zaalState = $zaalStateManager->getState($zaalDefaults);
-// } else {
-//     if (isset($_GET['reset']) && (string)$_GET['reset'] === '1') {
-//         $zaalState = $zaalStateManager->reset($zaalDefaults);
-//     } else {
-//         $zaalState = $zaalStateManager->applyRequest($_GET, $zaalDefaults, $zaalAllowedFilters);
-//     }
-
-//     $personState = $personStateManager->getState($personDefaults);
-// }
-
-if ($activeTab === 'activiteit') {
-    if (isset($_GET['reset']) && (string)$_GET['reset'] === '1') {
-        $activiteitState = $activiteitStateManager->reset($activiteitDefaults);
-    } else {
-        $activiteitState = $activiteitStateManager->applyRequest($_GET, $activiteitDefaults, $activiteitAllowedFilters);
+    if ($personMode === 'all') {
+        $request['active_only'] = '';
+    } elseif ($personMode === 'active') {
+        $request['active_only'] = '1';
     }
-
-    $fractieState = $fractieStateManager->getState($fractieDefaults);
-    $personState = $personStateManager->getState($personDefaults);
-    $zaakState = $zaakStateManager->getState($zaakDefaults);
-    $zaalState = $zaalStateManager->getState($zaalDefaults);
-    
-}  elseif ($activeTab === 'fractie') {
-    if (isset($_GET['reset']) && (string)$_GET['reset'] === '1') {
-        $fractieState = $fractieStateManager->reset($fractieDefaults);
-    } else {
-        $fractieState = $fractieStateManager->applyRequest($_GET, $fractieDefaults, $fractieAllowedFilters);
-    }
-
-    $activiteitState = $activiteitStateManager->getState($activiteitDefaults);
-    $personState = $personStateManager->getState($personDefaults);
-    $zaakState = $zaakStateManager->getState($zaakDefaults);
-    $zaalState = $zaalStateManager->getState($zaalDefaults);
-} elseif ($activeTab === 'person') {
-    if (isset($_GET['reset']) && (string)$_GET['reset'] === '1') {
-        $personState = $personStateManager->reset($personDefaults);
-    } else {
-        $personState = $personStateManager->applyRequest($_GET, $personDefaults, $personAllowedFilters);
-    }
-
-    $activiteitState = $activiteitStateManager->getState($activiteitDefaults);
-    $fractieState = $fractieStateManager->getState($fractieDefaults);
-    $zaakState = $zaakStateManager->getState($zaakDefaults);
-    $zaalState = $zaalStateManager->getState($zaalDefaults);
-} elseif ($activeTab === 'zaak') {
-    if (isset($_GET['reset']) && (string)$_GET['reset'] === '1') {
-        $zaakState = $zaakStateManager->reset($zaakDefaults);
-    } else {
-        $zaakState = $zaakStateManager->applyRequest($_GET, $zaakDefaults, $zaakAllowedFilters);
-    }
-
-    $personState = $personStateManager->getState($personDefaults);
-    $zaalState = $zaalStateManager->getState($zaalDefaults);
-    $fractieState = $fractieStateManager->getState($fractieDefaults);
-    $activiteitState = $activiteitStateManager->getState($activiteitDefaults);    
-} elseif ($activeTab === 'zaal') {
-    if (isset($_GET['reset']) && (string)$_GET['reset'] === '1') {
-        $zaalState = $zaalStateManager->reset($zaalDefaults);
-    } else {
-        $zaalState = $zaalStateManager->applyRequest($_GET, $zaalDefaults, $zaalAllowedFilters);
-    }
-
-    $activiteitState = $activiteitStateManager->getState($activiteitDefaults);
-    $fractieState = $fractieStateManager->getState($fractieDefaults);
-    $personState = $personStateManager->getState($personDefaults);
-    $zaakState = $zaakStateManager->getState($zaakDefaults);
 }
 
 $perPage = 50;
 
-/**
- * Person data
- */
-$personSort       = (string)$personState['sort'];
-$personDirection  = (string)$personState['direction'];
-$personPage       = max(1, (int)$personState['page']);
-$personFilters    = $personState['filters'];
+$activeTabConfig = $tabs[$activeTab];
 
-$personResult = $personApi->getPersons(
-    $personFilters,
-    $personSort,
-    $personDirection,
-    $personPage,
-    $perPage
-);
+if ($resetRequested) {
+    // Reset to the tab defaults first, then apply any explicit mode flags from the request.
+    $stateData = $activeTabConfig['defaults'];
 
-$persons = $personResult['data'];
-$personTotal = $personResult['total'];
-$personTotalPages = (int)ceil($personTotal / $perPage);
-$personCurrentPage = min($personPage, max(1, $personTotalPages > 0 ? $personTotalPages : 1));
+    foreach ($activeTabConfig['allowedFilters'] as $filterKey) {
+        if (array_key_exists($filterKey, $request)) {
+            $stateData['filters'][$filterKey] = is_string($request[$filterKey])
+                ? trim($request[$filterKey])
+                : $request[$filterKey];
+        }
+    }
 
-if ($personCurrentPage !== $personPage) {
-    $personState['page'] = $personCurrentPage;
-    $personStateManager->saveState($personState);
-
-    $personResult = $personApi->getPersons(
-        $personFilters,
-        $personSort,
-        $personDirection,
-        $personCurrentPage,
-        $perPage
+    $activeTabConfig['stateManager']->saveState($stateData);
+    $activeTabConfig['stateData'] = $stateData;
+} else {
+    $activeTabConfig['stateData'] = $activeTabConfig['stateManager']->applyRequest(
+        $request,
+        $activeTabConfig['defaults'],
+        $activeTabConfig['allowedFilters']
     );
+}
+$activeDataset = loadTabDataset($activeTabConfig, $perPage);
 
-    $persons = $personResult['data'];
+$total = $activeDataset['total'];
+$totalPages = $activeDataset['totalPages'];
+$currentPage = $activeDataset['currentPage'];
+$sort = $activeDataset['sort'];
+$direction = $activeDataset['direction'];
+$filters = $activeDataset['filters'];
+
+${$activeTabConfig['recordsVar']} = $activeDataset['records'];
+
+foreach ($activeDataset['extras'] as $extraName => $extraValue) {
+    $$extraName = $extraValue;
 }
 
-/**
- * Activiteit data
- */
-$activiteitSort = (string)$activiteitState['sort'];
-$activiteitDirection = (string)$activiteitState['direction'];
-$activiteitPage = max(1, (int)$activiteitState['page']);
-$activiteitFilters = $activiteitState['filters'];
-
-$activiteitResult = $activiteitApi->getActiviteiten(
-    $activiteitFilters,
-    $activiteitSort,
-    $activiteitDirection,
-    $activiteitPage,
-    $perPage
-);
-
-$activiteiten = $activiteitResult['data'];
-$activiteitTotal = $activiteitResult['total'];
-$activiteitTotalPages = (int)ceil($activiteitTotal / $perPage);
-$activiteitCurrentPage = min($activiteitPage, max(1, $activiteitTotalPages > 0 ? $activiteitTotalPages : 1));
-/** get the dropdown values */
-$activiteitSoorten = $activiteitApi->getActiviteitSoorten();
-
-if ($activiteitCurrentPage !== $activiteitPage) {
-    $activiteitState['page'] = $activiteitCurrentPage;
-    $activiteitStateManager->saveState($activiteitState);
-
-    $activiteitResult = $activiteitApi->getActiviteiten(
-        $activiteitFilters,
-        $activiteitSort,
-        $activiteitDirection,
-        $activiteitCurrentPage,
-        $perPage
-    );
-
-    $activiteiten = $activiteitResult['data'];
+$personActiveOnly = $activeTab === 'person' && (($filters['active_only'] ?? '') === '1');
+if ($activeTab === 'person') {
+    $personListTitle = $personActiveOnly ? 'Actieve personen' : 'Person List';
 }
 
-/**
- * Fractie data
- */
-$fractieSort = (string)$fractieState['sort'];
-$fractieDirection = (string)$fractieState['direction'];
-$fractiePage = max(1, (int)$fractieState['page']);
-$fractieFilters = $fractieState['filters'];
-
-$fractieResult = $fractieApi->getFracties(
-    $fractieFilters,
-    $fractieSort,
-    $fractieDirection,
-    $fractiePage,
-    $perPage
-);
-
-$fracties = $fractieResult['data'];
-$fractieTotal = $fractieResult['total'];
-$fractieTotalPages = (int)ceil($fractieTotal / $perPage);
-$fractieCurrentPage = min($fractiePage, max(1, $fractieTotalPages > 0 ? $fractieTotalPages : 1));
-
-if ($fractieCurrentPage !== $fractiePage) {
-    $fractieState['page'] = $fractieCurrentPage;
-    $fractieStateManager->saveState($fractieState);
-
-    $fractieResult = $fractieApi->getFracties(
-        $fractieFilters,
-        $fractieSort,
-        $fractieDirection,
-        $fractieCurrentPage,
-        $perPage
-    );
-
-    $fracties = $fractieResult['data'];
-}
-
-/**
- * zaak data
- */
-$zaakSort = (string)$zaakState['sort'];
-$zaakDirection = (string)$zaakState['direction'];
-$zaakPage = max(1, (int)$zaakState['page']);
-$zaakFilters = $zaakState['filters'];
-
-$zaakResult = $zaakApi->getZaken(
-    $zaakFilters,
-    $zaakSort,
-    $zaakDirection,
-    $zaakPage,
-    $perPage
-);
-
-$zaken = $zaakResult['data'];
-$zaakTotal = $zaakResult['total'];
-$zaakTotalPages = (int)ceil($zaakTotal / $perPage);
-$zaakCurrentPage = min($zaakPage, max(1, $zaakTotalPages > 0 ? $zaakTotalPages : 1));
-/** get the dropdown values */
-$zaakSoorten = $zaakApi->getZaakSoorten();
-
-if ($zaakCurrentPage !== $zaakPage) {
-    $zaakState['page'] = $zaakCurrentPage;
-    $zaakStateManager->saveState($zaakState);
-
-    $zaakResult = $zaakApi->getZaken(
-        $zaakFilters,
-        $zaakSort,
-        $zaakDirection,
-        $zaakCurrentPage,
-        $perPage
-    );
-
-    $zaken = $zaakResult['data'];
-}
-
-/**
- * Zaal data
- */
-$zaalSort       = (string)$zaalState['sort'];
-$zaalDirection  = (string)$zaalState['direction'];
-$zaalPage       = max(1, (int)$zaalState['page']);
-$zaalFilters    = $zaalState['filters'];
-
-$zaalResult = $zaalApi->getZalen(
-    $zaalFilters,
-    $zaalSort,
-    $zaalDirection,
-    $zaalPage,
-    $perPage
-);
-
-$zalen = $zaalResult['data'];
-$zaalTotal = $zaalResult['total'];
-$zaalTotalPages = (int)ceil($zaalTotal / $perPage);
-$zaalCurrentPage = min($zaalPage, max(1, $zaalTotalPages > 0 ? $zaalTotalPages : 1));
-
-if ($zaalCurrentPage !== $zaalPage) {
-    $zaalState['page'] = $zaalCurrentPage;
-    $zaalStateManager->saveState($zaalState);
-
-    $zaalResult = $zaalApi->getZalen(
-        $zaalFilters,
-        $zaalSort,
-        $zaalDirection,
-        $zaalCurrentPage,
-        $perPage
-    );
-
-    $zalen = $zaalResult['data'];
-}
-
-
+$pageTitle = $activeTabConfig['label'] . ' overzicht';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Persons / Zalen</title>
+    <title><?= htmlspecialchars($pageTitle) ?></title>
 
     <link
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
@@ -446,108 +284,82 @@ if ($zaalCurrentPage !== $zaalPage) {
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
         rel="stylesheet"
     >
+    <style>
+        .sidebar-nav .nav-link {
+            border-radius: 0.75rem;
+            color: #1f2937;
+            font-weight: 600;
+            padding: 0.85rem 1rem;
+        }
+
+        .sidebar-nav .nav-link:hover {
+            background-color: #eef2ff;
+            color: #1d4ed8;
+        }
+
+        .sidebar-nav .nav-link.active {
+            background-color: #1d4ed8;
+            color: #fff;
+            box-shadow: 0 0.5rem 1rem rgba(29, 78, 216, 0.18);
+        }
+
+        .sidebar-nav .nav-link.sub-item {
+            margin-left: 1rem;
+            font-size: 0.95rem;
+            font-weight: 500;
+            padding-top: 0.6rem;
+            padding-bottom: 0.6rem;
+        }
+    </style>
 </head>
 <body class="bg-light">
 <div class="container py-4">
-    <ul class="nav nav-tabs mb-3" id="mainTab" role="tablist">
-        <li class="nav-item" role="presentation">
-            <a
-                class="nav-link <?= $activeTab === 'activiteit' ? 'active' : '' ?>"
-                href="index.php?tab=activiteit"
-            >
-                Activiteit
-            </a>
-        </li>
-        <li class="nav-item" role="presentation">
-            <a
-                class="nav-link <?= $activeTab === 'person' ? 'active' : '' ?>"
-                href="index.php?tab=person"
-            >
-                Persoon
-            </a>
-        </li>
-        <li class="nav-item" role="presentation">
-            <a
-                class="nav-link <?= $activeTab === 'fractie' ? 'active' : '' ?>"
-                href="index.php?tab=fractie"
-            >
-                Fractie
-            </a>
-        </li>
-        <li class="nav-item" role="presentation">
-            <a
-                class="nav-link <?= $activeTab === 'zaal' ? 'active' : '' ?>"
-                href="index.php?tab=zaal"
-            >
-                Zaal
-            </a>
-        </li>
-        <li class="nav-item" role="presentation">
-            <a
-                class="nav-link <?= $activeTab === 'zaak' ? 'active' : '' ?>"
-                href="index.php?tab=zaak"
-            >
-                Zaak
-            </a>
-        </li>
-    </ul>
+    <div class="row g-4 align-items-start">
+        <aside class="col-12 col-lg-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Overzicht</h2>
+                    <nav class="nav flex-column gap-2 sidebar-nav" aria-label="Hoofdnavigatie">
+                        <?php foreach ($tabs as $tabKey => $tab): ?>
+                            <?php
+                            $isPersonAllView = $tabKey === 'person' && $activeTab === 'person' && !$personActiveOnly;
+                            $navLinkClass = ($tabKey === 'person')
+                                ? ($isPersonAllView ? 'active' : '')
+                                : ($activeTab === $tabKey ? 'active' : '');
+                            $navHref = $tabKey === 'person'
+                                ? 'index.php?tab=person&person_view=all'
+                                : 'index.php?tab=' . urlencode($tabKey);
+                            ?>
+                            <a
+                                class="nav-link <?= $navLinkClass ?>"
+                                href="<?= $navHref ?>"
+                            >
+                                <?= htmlspecialchars($tab['label']) ?>
+                            </a>
+                            <?php if ($tabKey === 'person'): ?>
+                                <a
+                                    class="nav-link sub-item <?= $personActiveOnly ? 'active' : '' ?>"
+                                    href="index.php?tab=person&person_view=active"
+                                >
+                                    Actieve
+                                </a>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </nav>
 
-    <?php if ($activeTab === 'activiteit'): ?>
-        <?php
-        $total = $activiteitTotal;
-        $totalPages = $activiteitTotalPages;
-        $currentPage = $activiteitCurrentPage;
-        $sort = $activiteitSort;
-        $direction = $activiteitDirection;
-        $filters = $activiteitFilters;
+                    <div class="mt-4 pt-3 border-top">
+                        <a class="btn btn-outline-primary w-100" href="admin/index.php">
+                            <i class="fa-solid fa-user-shield"></i> Administrator
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </aside>
 
-        include __DIR__ . '/app/views/activiteit/listview.php';
-        ?>
-    <?php elseif ($activeTab === 'fractie'): ?>
-        <?php
-        $total = $fractieTotal;
-        $totalPages = $fractieTotalPages;
-        $currentPage = $fractieCurrentPage;
-        $sort = $fractieSort;
-        $direction = $fractieDirection;
-        $filters = $fractieFilters;
-
-        include __DIR__ . '/app/views/fractie/listview.php';
-        ?>
-    <?php elseif ($activeTab === 'person'): ?>
-        <?php
-        $total = $personTotal;
-        $totalPages = $personTotalPages;
-        $currentPage = $personCurrentPage;
-        $sort = $personSort;
-        $direction = $personDirection;
-        $filters = $personFilters;
-
-        include __DIR__ . '/app/views/persoon/listview.php';
-        ?>
-    <?php elseif ($activeTab === 'zaal'): ?>
-        <?php
-        $total = $zaalTotal;
-        $totalPages = $zaalTotalPages;
-        $currentPage = $zaalCurrentPage;
-        $sort = $zaalSort;
-        $direction = $zaalDirection;
-        $filters = $zaalFilters;
-
-        include __DIR__ . '/app/views/zaal/listview.php';
-        ?>
-    <?php elseif ($activeTab === 'zaak'): ?>
-        <?php
-        $total = $zaakTotal;
-        $totalPages = $zaakTotalPages;
-        $currentPage = $zaakCurrentPage;
-        $sort = $zaakSort;
-        $direction = $zaakDirection;
-        $filters = $zaakFilters;
-
-        include __DIR__ . '/app/views/zaak/listview.php';
-        ?>        
-    <?php endif; ?>
+        <main class="col-12 col-lg-9">
+            <?php include $activeTabConfig['view']; ?>
+        </main>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

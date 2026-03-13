@@ -7,6 +7,29 @@ use PDO;
 
 class FractieModel
 {
+    public static function getListDefaults(): array
+    {
+        return [
+            'sort' => 'naam_nl',
+            'direction' => 'asc',
+            'page' => 1,
+            'filters' => array_fill_keys(self::getAllowedFilters(), ''),
+        ];
+    }
+
+    public static function getAllowedFilters(): array
+    {
+        return [
+            'nummer',
+            'afkorting',
+            'naam_nl',
+            'aantal_zetels',
+            'aantal_stemmen',
+            'datum_actief',
+            'datum_inactief',
+        ];
+    }
+
     public function __construct(
         private PDO $pdo
     ) {
@@ -91,11 +114,6 @@ class FractieModel
         if (($filters['naam_nl'] ?? '') !== '') {
             $conditions[] = 'naam_nl LIKE :naam_nl';
             $params[':naam_nl'] = '%' . $filters['naam_nl'] . '%';
-        }
-
-        if (($filters['naam_en'] ?? '') !== '') {
-            $conditions[] = 'naam_en LIKE :naam_en';
-            $params[':naam_en'] = '%' . $filters['naam_en'] . '%';
         }
 
         if (($filters['aantal_zetels'] ?? '') !== '') {

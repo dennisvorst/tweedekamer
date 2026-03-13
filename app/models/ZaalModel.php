@@ -7,6 +7,21 @@ use PDO;
 
 class ZaalModel
 {
+    public static function getListDefaults(): array
+    {
+        return [
+            'sort' => 'naam',
+            'direction' => 'asc',
+            'page' => 1,
+            'filters' => array_fill_keys(self::getAllowedFilters(), ''),
+        ];
+    }
+
+    public static function getAllowedFilters(): array
+    {
+        return ['id', 'naam', 'syscode'];
+    }
+
     public function __construct(
         private PDO $pdo
     ) {

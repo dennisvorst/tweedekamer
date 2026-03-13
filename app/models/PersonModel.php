@@ -7,6 +7,21 @@ use PDO;
 
 class PersonModel
 {
+    public static function getListDefaults(): array
+    {
+        return [
+            'sort' => 'achternaam',
+            'direction' => 'asc',
+            'page' => 1,
+            'filters' => array_fill_keys(self::getAllowedFilters(), ''),
+        ];
+    }
+
+    public static function getAllowedFilters(): array
+    {
+        return ['nummer', 'roepnaam', 'achternaam', 'geboortedatum', 'geboortedatum_tot', 'geslacht', 'active_only'];
+    }
+
     public function __construct(
         private PDO $pdo
     ) {
@@ -26,6 +41,7 @@ class PersonModel
         $sql = "
             SELECT id, nummer, roepnaam, achternaam, geboortedatum, geslacht
             FROM persoon
+            WHERE (is_verwijderd = 0 OR is_verwijderd IS NULL)
             {$where}
             ORDER BY {$sort} {$direction}
             LIMIT :limit OFFSET :offset
@@ -50,7 +66,12 @@ class PersonModel
         $params = [];
         $where = $this->buildWhereClause($filters, $params);
 
-        $sql = "SELECT COUNT(*) FROM persoon {$where}";
+        $sql = "
+            SELECT COUNT(*)
+            FROM persoon
+            WHERE (is_verwijderd = 0 OR is_verwijderd IS NULL)
+            {$where}
+        ";
         $stmt = $this->pdo->prepare($sql);
 
         foreach ($params as $key => $value) {
@@ -245,9 +266,19 @@ class PersonModel
             $params[':achternaam'] = '%' . $filters['achternaam'] . '%';
         }
 
-        if (!empty($filters['geboortedatum'])) {
-            $conditions[] = 'geboortedatum = :geboortedatum';
-            $params[':geboortedatum'] = $filters['geboortedatum'];
+        $geboortedatumVan = trim((string)($filters['geboortedatum'] ?? ''));
+        $geboortedatumTot = trim((string)($filters['geboortedatum_tot'] ?? ''));
+
+        if ($geboortedatumVan !== '' && $geboortedatumTot !== '') {
+            $conditions[] = 'geboortedatum BETWEEN :geboortedatum_van AND :geboortedatum_tot';
+            $params[':geboortedatum_van'] = min($geboortedatumVan, $geboortedatumTot);
+            $params[':geboortedatum_tot'] = max($geboortedatumVan, $geboortedatumTot);
+        } elseif ($geboortedatumVan !== '') {
+            $conditions[] = 'geboortedatum >= :geboortedatum_van';
+            $params[':geboortedatum_van'] = $geboortedatumVan;
+        } elseif ($geboortedatumTot !== '') {
+            $conditions[] = 'geboortedatum <= :geboortedatum_tot';
+            $params[':geboortedatum_tot'] = $geboortedatumTot;
         }
 
         if (!empty($filters['geslacht'])) {
@@ -255,7 +286,19 @@ class PersonModel
             $params[':geslacht'] = $filters['geslacht'];
         }
 
-        return !empty($conditions) ? 'WHERE ' . implode(' AND ', $conditions) : '';
+        if (($filters['active_only'] ?? '') === '1') {
+            $conditions[] = "
+                EXISTS (
+                    SELECT 1
+                    FROM fractie_zetel_persoon fzp
+                    WHERE fzp.persoon_id = persoon.id
+                    AND (fzp.is_verwijderd = 0 OR fzp.is_verwijderd IS NULL)
+                    AND fzp.tot_en_met IS NULL
+                )
+            ";
+        }
+
+        return !empty($conditions) ? ' AND ' . implode(' AND ', $conditions) : '';
     }
 
     public function getPersonBesluitStemRows(string $persoonId): array

@@ -7,6 +7,27 @@ use PDO;
 
 class ActiviteitModel
 {
+    public static function getListDefaults(): array
+    {
+        return [
+            'sort' => 'datum',
+            'direction' => 'desc',
+            'page' => 1,
+            'filters' => array_fill_keys(self::getAllowedFilters(), ''),
+        ];
+    }
+
+    public static function getAllowedFilters(): array
+    {
+        return [
+            'soort',
+            'nummer',
+            'onderwerp',
+            'datum',
+            'locatie',
+        ];
+    }
+
     public function __construct(
         private PDO $pdo
     ) {
@@ -34,7 +55,7 @@ class ActiviteitModel
                 eindtijd,
                 locatie
             FROM activiteit
-            WHERE 1 = 1
+            WHERE (is_verwijderd = 0 OR is_verwijderd IS NULL)
             {$where}
             ORDER BY {$sort} {$direction}
             LIMIT :limit OFFSET :offset
@@ -62,7 +83,7 @@ class ActiviteitModel
         $sql = "
             SELECT COUNT(*)
             FROM activiteit
-            WHERE 1 = 1
+            WHERE (is_verwijderd = 0 OR is_verwijderd IS NULL)
             {$where}
         ";
 
@@ -90,6 +111,7 @@ class ActiviteitModel
                 ON c.id = a.voortouwcommissie_id
                 AND (c.is_verwijderd = 0 OR c.is_verwijderd IS NULL)
             WHERE a.id = :id
+            AND (a.is_verwijderd = 0 OR a.is_verwijderd IS NULL)
             LIMIT 1
         ";
 
@@ -176,6 +198,61 @@ class ActiviteitModel
         return $stmt->fetchAll();
     }    
 
+    public function getAgendapuntDetails(string $id): ?array
+    {
+        $sql = "
+            SELECT
+                a.*,
+                act.id AS activiteit_id,
+                act.nummer AS activiteit_nummer,
+                act.onderwerp AS activiteit_onderwerp,
+                act.datum AS activiteit_datum
+            FROM agendapunt a
+            LEFT JOIN activiteit act
+                ON act.id = a.activiteit_id
+               AND (act.is_verwijderd = 0 OR act.is_verwijderd IS NULL)
+            WHERE a.id = :id
+              AND (a.is_verwijderd = 0 OR a.is_verwijderd IS NULL)
+            LIMIT 1
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':id', $id);
+        $stmt->execute();
+
+        $result = $stmt->fetch();
+
+        return $result === false ? null : $result;
+    }
+
+    public function getAgendapuntBesluitRows(string $agendapuntId): array
+    {
+        $sql = "
+            SELECT
+                id,
+                agendapunt_id,
+                besluit_soort,
+                stemmingssoort,
+                besluittekst,
+                opmerking,
+                status,
+                agendapunt_zaak_besluitvolgorde
+            FROM besluit
+            WHERE agendapunt_id = :agendapunt_id
+              AND (is_verwijderd = 0 OR is_verwijderd IS NULL)
+            ORDER BY
+                CASE WHEN agendapunt_zaak_besluitvolgorde IS NULL THEN 999999 ELSE agendapunt_zaak_besluitvolgorde END,
+                besluit_soort ASC,
+                id ASC
+        ";
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':agendapunt_id', $agendapuntId);
+        $stmt->execute();
+
+        return $stmt->fetchAll();
+    }
+
     public function getActiviteitSoorten(): array
     {
         $sql = "
@@ -183,6 +260,7 @@ class ActiviteitModel
             FROM activiteit
             WHERE soort IS NOT NULL
             AND TRIM(soort) <> ''
+            AND (is_verwijderd = 0 OR is_verwijderd IS NULL)
             ORDER BY soort
         ";
 

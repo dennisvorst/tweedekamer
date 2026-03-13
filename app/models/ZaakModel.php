@@ -7,6 +7,32 @@ use PDO;
 
 class ZaakModel
 {
+    public static function getListDefaults(): array
+    {
+        return [
+            'sort' => 'gestart_op',
+            'direction' => 'desc',
+            'page' => 1,
+            'filters' => array_fill_keys(self::getAllowedFilters(), ''),
+        ];
+    }
+
+    public static function getAllowedFilters(): array
+    {
+        return [
+            'nummer',
+            'soort',
+            'titel',
+            'status',
+            'onderwerp',
+            'gestart_op',
+            'organisatie',
+            'vergaderjaar',
+            'afgedaan',
+            'groot_project',
+        ];
+    }
+
     public function __construct(
         private PDO $pdo
     ) {

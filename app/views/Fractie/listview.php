@@ -38,24 +38,13 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
             </div>
 
             <div class="col-md-3">
-                <label for="naam_nl" class="form-label">Naam NL</label>
+                <label for="naam_nl" class="form-label">Naam</label>
                 <input
                     type="text"
                     class="form-control"
                     id="naam_nl"
                     name="naam_nl"
                     value="<?= htmlspecialchars((string)($filters['naam_nl'] ?? '')) ?>"
-                >
-            </div>
-
-            <div class="col-md-3">
-                <label for="naam_en" class="form-label">Naam EN</label>
-                <input
-                    type="text"
-                    class="form-control"
-                    id="naam_en"
-                    name="naam_en"
-                    value="<?= htmlspecialchars((string)($filters['naam_en'] ?? '')) ?>"
                 >
             </div>
 
@@ -77,7 +66,7 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
                     class="form-control"
                     id="aantal_stemmen"
                     name="aantal_stemmen"
-                    value="<?= htmlspecialchars(formatDate($fractie['datum_actief'] ?? null)) ?>"
+                    value="<?= htmlspecialchars((string)($filters['aantal_stemmen'] ?? '')) ?>"
                 >
             </div>
 
@@ -88,7 +77,7 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
                     class="form-control"
                     id="datum_actief"
                     name="datum_actief"
-                    value="<?= htmlspecialchars(formatDateForInput($fractie['datum_actief'] ?? null)) ?>"
+                    value="<?= htmlspecialchars(formatDateForInput($filters['datum_actief'] ?? null)) ?>"
                 >
             </div>
 
@@ -129,12 +118,7 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
                         </th>
                         <th>
                             <a class="text-white text-decoration-none" href="<?= sortLink('naam_nl', $sort, $direction) ?>">
-                                Naam NL<?= sortIcon('naam_nl', $sort, $direction) ?>
-                            </a>
-                        </th>
-                        <th>
-                            <a class="text-white text-decoration-none" href="<?= sortLink('naam_en', $sort, $direction) ?>">
-                                Naam EN<?= sortIcon('naam_en', $sort, $direction) ?>
+                                Naam<?= sortIcon('naam_nl', $sort, $direction) ?>
                             </a>
                         </th>
                         <th>
@@ -167,7 +151,6 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
                                 <td><?= htmlspecialchars((string)($fractie['nummer'] ?? '')) ?></td>
                                 <td><?= htmlspecialchars((string)($fractie['afkorting'] ?? '')) ?></td>
                                 <td><?= htmlspecialchars((string)($fractie['naam_nl'] ?? '')) ?></td>
-                                <td><?= htmlspecialchars((string)($fractie['naam_en'] ?? '')) ?></td>
                                 <td class="text-end"><?= htmlspecialchars(formatNumber($fractie['aantal_zetels'] ?? '')) ?></td>
                                 <td class="text-end"><?= htmlspecialchars(formatNumber($fractie['aantal_stemmen'] ?? '')) ?></td>
                                 <td><?= htmlspecialchars(formatDate($fractie['datum_actief'] ?? '')) ?></td>
@@ -185,7 +168,7 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
                         <?php endforeach; ?>
                     <?php else: ?>
                         <tr>
-                            <td colspan="9" class="text-center text-muted">No fracties found.</td>
+                            <td colspan="8" class="text-center text-muted">No fracties found.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>

@@ -122,31 +122,60 @@ class BesluitModel
                 COALESCE(f.naam_nl, f.naam_en, s.actor_fractie, f.afkorting, 'Onbekend') AS fractie_naam,
                 COALESCE(f.afkorting, '') AS fractie_afkorting,
                 MAX(COALESCE(s.fractie_grootte, 0)) AS fractie_grootte,
-                
+                LOWER(TRIM(COALESCE(b.stemmingssoort, ''))) AS stemmingssoort_normalized,
                 SUM(
                     CASE
-                        WHEN LOWER(TRIM(COALESCE(s.soort, ''))) = 'voor' THEN 1
+                        WHEN LOWER(TRIM(COALESCE(s.soort, ''))) = 'voor' THEN
+                            CASE
+                                WHEN LOWER(TRIM(COALESCE(b.stemmingssoort, ''))) = 'hoofdelijk' THEN 1
+                                WHEN COALESCE(s.fractie_grootte, 0) > 0 THEN s.fractie_grootte
+                                ELSE 1
+                            END
                         ELSE 0
                     END
                 ) AS voor_count,
 
                 SUM(
                     CASE
-                        WHEN LOWER(TRIM(COALESCE(s.soort, ''))) = 'tegen' THEN 1
+                        WHEN LOWER(TRIM(COALESCE(s.soort, ''))) = 'tegen' THEN
+                            CASE
+                                WHEN LOWER(TRIM(COALESCE(b.stemmingssoort, ''))) = 'hoofdelijk' THEN 1
+                                WHEN COALESCE(s.fractie_grootte, 0) > 0 THEN s.fractie_grootte
+                                ELSE 1
+                            END
                         ELSE 0
                     END
                 ) AS tegen_count,
 
                 SUM(
                     CASE
-                        WHEN s.soort IS NULL
-                        OR LOWER(TRIM(COALESCE(s.soort, ''))) NOT IN ('voor', 'tegen')
-                        THEN 1
+                        WHEN LOWER(TRIM(COALESCE(s.soort, ''))) = 'niet deelgenomen'
+                        THEN
+                            CASE
+                                WHEN LOWER(TRIM(COALESCE(b.stemmingssoort, ''))) = 'hoofdelijk' THEN 1
+                                WHEN COALESCE(s.fractie_grootte, 0) > 0 THEN s.fractie_grootte
+                                ELSE 1
+                            END
                         ELSE 0
                     END
-                ) AS anders_count
+                ) AS absent_count,
+
+                SUM(
+                    CASE
+                        WHEN LOWER(TRIM(COALESCE(s.soort, ''))) = ''
+                        THEN
+                            CASE
+                                WHEN LOWER(TRIM(COALESCE(b.stemmingssoort, ''))) = 'hoofdelijk' THEN 1
+                                WHEN COALESCE(s.fractie_grootte, 0) > 0 THEN s.fractie_grootte
+                                ELSE 1
+                            END
+                        ELSE 0
+                    END
+                ) AS onthouden_count
 
             FROM stemming s
+            INNER JOIN besluit b
+                ON b.id = s.besluit_id
             LEFT JOIN fractie f
                 ON f.id = s.fractie_id
             AND (f.is_verwijderd = 0 OR f.is_verwijderd IS NULL)
@@ -155,7 +184,8 @@ class BesluitModel
             GROUP BY
                 COALESCE(f.id, s.fractie_id),
                 COALESCE(f.naam_nl, f.naam_en, s.actor_fractie, f.afkorting, 'Onbekend'),
-                COALESCE(f.afkorting, '')
+                COALESCE(f.afkorting, ''),
+                LOWER(TRIM(COALESCE(b.stemmingssoort, '')))
             ORDER BY fractie_naam ASC
         ";
 

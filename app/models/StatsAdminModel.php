@@ -73,12 +73,32 @@ class StatsAdminModel
 
         $this->pdo->exec($sql);
 
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_totaal ON fractie_stats (totaal_stemmen)");
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_voor ON fractie_stats (voor_stemmen)");
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_tegen ON fractie_stats (tegen_stemmen)");
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_anders ON fractie_stats (anders_stemmen)");
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_voor_pct ON fractie_stats (voor_percentage)");
-        $this->pdo->exec("CREATE INDEX idx_fractie_stats_tegen_pct ON fractie_stats (tegen_percentage)");
+        $indexes = [
+            "CREATE INDEX idx_fractie_stats_totaal ON fractie_stats (totaal_stemmen)",
+            "CREATE INDEX idx_fractie_stats_voor ON fractie_stats (voor_stemmen)",
+            "CREATE INDEX idx_fractie_stats_tegen ON fractie_stats (tegen_stemmen)",
+            "CREATE INDEX idx_fractie_stats_anders ON fractie_stats (anders_stemmen)",
+            "CREATE INDEX idx_fractie_stats_voor_pct ON fractie_stats (voor_percentage)",
+            "CREATE INDEX idx_fractie_stats_tegen_pct ON fractie_stats (tegen_percentage)",
+        ];
+
+        foreach ($indexes as $indexSql) {
+            try {
+                $this->pdo->exec($indexSql);
+            } catch (\PDOException $e) {
+                // ignore duplicate-index style errors
+            }
+        }
+    }
+
+    public function dropTable(string $tableName): void
+    {
+        $this->pdo->exec(sprintf('DROP TABLE IF EXISTS `%s`', $tableName));
+    }
+
+    public function clearTable(string $tableName): void
+    {
+        $this->pdo->exec(sprintf('TRUNCATE TABLE `%s`', $tableName));
     }
 
     public function getAllPersoonIds(): array
@@ -291,6 +311,25 @@ class StatsAdminModel
     }    
 
     /** fractie */
+    public function rebuildFractieStatsBatch(int $offset = 0, int $limit = 100): array
+    {
+        $fractieIds = $this->getAllFractieIds();
+        $total = count($fractieIds);
+        $batch = array_slice($fractieIds, $offset, $limit);
+
+        foreach ($batch as $fractieId) {
+            $this->rebuildFractieStat((string)$fractieId);
+        }
+
+        return [
+            'processed' => count($batch),
+            'offset' => $offset,
+            'next_offset' => $offset + count($batch),
+            'total' => $total,
+            'done' => ($offset + count($batch)) >= $total,
+        ];
+    }
+
     public function rebuildFractieStat(string $fractieId): void
     {
         $sql = "

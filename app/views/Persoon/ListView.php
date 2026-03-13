@@ -2,11 +2,12 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers/list_helpers.php';
+require_once __DIR__ . '/../helpers/person_helpers.php';
 ?>
 
 <div class="card shadow-sm">
     <div class="card-header">
-        <h5 class="mb-0">Person List</h5>
+        <h5 class="mb-0"><?= htmlspecialchars($personListTitle ?? 'Person List') ?></h5>
     </div>
 
     <div class="card-body">
@@ -14,6 +15,7 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
             <input type="hidden" name="tab" value="person">
             <input type="hidden" name="sort" value="<?= htmlspecialchars($sort) ?>">
             <input type="hidden" name="direction" value="<?= htmlspecialchars($direction) ?>">
+            <input type="hidden" name="active_only" value="<?= htmlspecialchars((string)($filters['active_only'] ?? '')) ?>">
 
             <div class="col-md-2">
                 <label for="nummer" class="form-label">Nummer</label>
@@ -26,7 +28,7 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
                 >
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label for="roepnaam" class="form-label">Roepnaam</label>
                 <input
                     type="text"
@@ -37,7 +39,7 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
                 >
             </div>
 
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label for="achternaam" class="form-label">Achternaam</label>
                 <input
                     type="text"
@@ -49,14 +51,27 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
             </div>
 
             <div class="col-md-2">
-                <label for="geboortedatum" class="form-label">Geboortedatum</label>
-                <input
-                    type="date"
-                    class="form-control"
-                    id="geboortedatum"
-                    name="geboortedatum"
-                    value="<?= htmlspecialchars(formatDateForInput($filters['geboortedatum'] ?? null)) ?>"
-                >
+                <div class="mb-3">
+                    <label for="geboortedatum" class="form-label">Geboren vanaf</label>
+                    <input
+                        type="date"
+                        class="form-control"
+                        id="geboortedatum"
+                        name="geboortedatum"
+                        value="<?= htmlspecialchars(formatDateForInput($filters['geboortedatum'] ?? null)) ?>"
+                    >
+                </div>
+
+                <div>
+                    <label for="geboortedatum_tot" class="form-label">Geboren tot</label>
+                    <input
+                        type="date"
+                        class="form-control"
+                        id="geboortedatum_tot"
+                        name="geboortedatum_tot"
+                        value="<?= htmlspecialchars(formatDateForInput($filters['geboortedatum_tot'] ?? null)) ?>"
+                    >
+                </div>
             </div>
 
             <div class="col-md-2">
@@ -73,7 +88,10 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
                 <button type="submit" class="btn btn-primary">
                     <i class="fa-solid fa-filter"></i> Filter
                 </button>
-                <a href="index.php?tab=person&reset=1" class="btn btn-outline-secondary">
+                <a
+                    href="index.php?tab=person&reset=1<?= (($filters['active_only'] ?? '') === '1') ? '&active_only=1' : '' ?>"
+                    class="btn btn-outline-secondary"
+                >
                     <i class="fa-solid fa-rotate-left"></i> Reset
                 </a>
             </div>
@@ -119,7 +137,7 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
                                 <td><?= htmlspecialchars((string)($person['roepnaam'] ?? '')) ?></td>
                                 <td><?= htmlspecialchars((string)($person['achternaam'] ?? '')) ?></td>
                                 <td><?= htmlspecialchars(formatDate($person['geboortedatum'] ?? '')) ?></td>
-                                <td><?= htmlspecialchars((string)($person['geslacht'] ?? '')) ?></td>
+                                <td><?= renderPersonGenderIconOnly((string)($person['geslacht'] ?? '')) ?></td>
                                 <td class="text-center">
                                     <a
                                         href="persondetails.php?id=<?= urlencode((string)$person['id']) ?>"
@@ -143,7 +161,7 @@ require_once __DIR__ . '/../helpers/list_helpers.php';
         <?php renderPagination($currentPage, $totalPages, 25, 'Person pagination'); ?>
 
         <div class="mt-3 text-muted small">
-            Showing <?= count($persons) ?> of <?= (int)$total ?> persons
+            Showing <?= count($persons) ?> of <?= (int)$total ?> persons<?= (($filters['active_only'] ?? '') === '1') ? ' with an active fractiezetel' : '' ?>
         </div>
     </div>
 </div>

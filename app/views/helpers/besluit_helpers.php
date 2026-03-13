@@ -279,35 +279,42 @@ if (!function_exists('renderBesluitDetails')) {
                     </div>
                 </div>
 
-                <?php renderBesluitStemmingenSection($stemmingRows, $fractieStemSamenvattingRows); ?>
+                <?php renderBesluitStemmingenSection(
+                    $besluit['stemmingssoort'] ?? null,
+                    $stemmingRows,
+                    $fractieStemSamenvattingRows
+                ); ?>
             </div>
         </div>
         <?php
     }
 
-    if (!function_exists('splitBesluitStemmingRowsPersoonlijk')) {
-        function splitBesluitStemmingRowsPersoonlijk(array $rows): array
-        {
-            $result = [
-                'voor' => [],
-                'tegen' => [],
-                'anders' => [],
-            ];
+if (!function_exists('splitBesluitStemmingRowsPersoonlijk')) {
+    function splitBesluitStemmingRowsPersoonlijk(array $rows): array
+    {
+        $result = [
+            'voor' => [],
+            'tegen' => [],
+            'onthouden' => [],
+            'absent' => [],
+        ];
 
-            foreach ($rows as $row) {
-                $soort = trim(mb_strtolower((string)($row['soort'] ?? '')));
+        foreach ($rows as $row) {
+            $soort = trim(mb_strtolower((string)($row['soort'] ?? '')));
 
-                if ($soort === 'voor') {
-                    $result['voor'][] = $row;
-                } elseif ($soort === 'tegen') {
-                    $result['tegen'][] = $row;
-                } else {
-                    $result['anders'][] = $row;
-                }
+            if ($soort === 'voor') {
+                $result['voor'][] = $row;
+            } elseif ($soort === 'tegen') {
+                $result['tegen'][] = $row;
+            } elseif ($soort === 'niet deelgenomen') {
+                $result['absent'][] = $row;
+            } else {
+                $result['onthouden'][] = $row;
             }
-
-            return $result;
         }
+
+        return $result;
+    }
     }
 
 if (!function_exists('sortBesluitStemmingRowsByName')) {
@@ -335,14 +342,20 @@ if (!function_exists('renderBesluitPersoonNaamOnly')) {
             $iconHtml = '<i class="fa-solid fa-check text-success me-1"></i>';
         } elseif ($type === 'tegen') {
             $iconHtml = '<i class="fa-solid fa-xmark text-danger me-1"></i>';
-        } else {
+        } elseif ($type === 'absent') {
             $iconHtml = '<i class="fa-solid fa-minus text-muted me-1"></i>';
+        } else {
+            $iconHtml = '<i class="fa-solid fa-circle text-secondary me-1"></i>';
         }
 
         $reason = null;
-        if ($type === 'anders') {
+        if ($type === 'onthouden' || $type === 'absent') {
             $soort = trim((string)($row['soort'] ?? ''));
-            $reason = $soort !== '' ? $soort : 'Niet deelgenomen';
+            if ($type === 'absent') {
+                $reason = 'Niet deelgenomen';
+            } else {
+                $reason = $soort !== '' ? $soort : 'Onthouden';
+            }
         }
         ?>
         <div class="mb-2">
@@ -373,7 +386,8 @@ if (!function_exists('renderBesluitPersoonNaamOnly')) {
 
             $voorRows = sortBesluitStemmingRowsByName($split['voor']);
             $tegenRows = sortBesluitStemmingRowsByName($split['tegen']);
-            $andersRows = sortBesluitStemmingRowsByName($split['anders']);
+            $onthoudenRows = sortBesluitStemmingRowsByName($split['onthouden']);
+            $absentRows = sortBesluitStemmingRowsByName($split['absent']);
             ?>
             <div class="table-responsive">
                 <table class="table table-bordered align-top">
@@ -381,24 +395,30 @@ if (!function_exists('renderBesluitPersoonNaamOnly')) {
                         <tr>
                             <th class="text-success">Voor (<?php echo count($voorRows);?>)</th>
                             <th class="text-danger">Tegen (<?php echo count($tegenRows);?>)</th>
-                            <th class="text-muted">Anders (<?php echo count($andersRows);?>)</th>
+                            <th class="text-secondary">Onthouden (<?php echo count($onthoudenRows);?>)</th>
+                            <th class="text-muted">Absent (<?php echo count($absentRows);?>)</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td style="width:33.33%;">
+                            <td style="width:25%;">
                                 <?php foreach ($voorRows as $row): ?>
                                     <?php renderBesluitPersoonNaamOnly($row, 'voor'); ?>
                                 <?php endforeach; ?>
                             </td>
-                            <td style="width:33.33%;">
+                            <td style="width:25%;">
                                 <?php foreach ($tegenRows as $row): ?>
                                     <?php renderBesluitPersoonNaamOnly($row, 'tegen'); ?>
                                 <?php endforeach; ?>
                             </td>
-                            <td style="width:33.33%;">
-                                <?php foreach ($andersRows as $row): ?>
-                                    <?php renderBesluitPersoonNaamOnly($row, 'anders'); ?>
+                            <td style="width:25%;">
+                                <?php foreach ($onthoudenRows as $row): ?>
+                                    <?php renderBesluitPersoonNaamOnly($row, 'onthouden'); ?>
+                                <?php endforeach; ?>
+                            </td>
+                            <td style="width:25%;">
+                                <?php foreach ($absentRows as $row): ?>
+                                    <?php renderBesluitPersoonNaamOnly($row, 'absent'); ?>
                                 <?php endforeach; ?>
                             </td>
                         </tr>
@@ -416,16 +436,38 @@ if (!function_exists('renderBesluitPersoonNaamOnly')) {
                 echo '<div class="text-muted">Geen fractiestemmingen beschikbaar.</div>';
                 return;
             }
+
+            $totaalVoor = array_sum(array_map(
+                static fn(array $row): int => (int)($row['voor_count'] ?? 0),
+                $fractieStemSamenvattingRows
+            ));
+            $totaalTegen = array_sum(array_map(
+                static fn(array $row): int => (int)($row['tegen_count'] ?? 0),
+                $fractieStemSamenvattingRows
+            ));
+            $totaalOnthouden = array_sum(array_map(
+                static fn(array $row): int => (int)($row['onthouden_count'] ?? 0),
+                $fractieStemSamenvattingRows
+            ));
+            $totaalAbsent = array_sum(array_map(
+                static fn(array $row): int => (int)($row['absent_count'] ?? 0),
+                $fractieStemSamenvattingRows
+            ));
+            $totaalFractiegrootte = array_sum(array_map(
+                static fn(array $row): int => (int)($row['fractie_grootte'] ?? 0),
+                $fractieStemSamenvattingRows
+            ));
             ?>
             <div class="table-responsive">
                 <table class="table table-striped table-hover align-middle">
                     <thead>
                         <tr>
                             <th>Naam</th>
-                            <th class="text-end">Fractiegrootte</th>
-                            <th class="text-end">Voor</th>
-                            <th class="text-end">Tegen</th>
-                            <th class="text-end">Anders</th>
+                            <th class="text-end">Fractiegrootte (<?= htmlspecialchars((string)$totaalFractiegrootte) ?>)</th>
+                            <th class="text-end">Voor (<?= htmlspecialchars((string)$totaalVoor) ?>)</th>
+                            <th class="text-end">Tegen (<?= htmlspecialchars((string)$totaalTegen) ?>)</th>
+                            <th class="text-end">Onthouden (<?= htmlspecialchars((string)$totaalOnthouden) ?>)</th>
+                            <th class="text-end">Absent (<?= htmlspecialchars((string)$totaalAbsent) ?>)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -448,7 +490,8 @@ if (!function_exists('renderBesluitPersoonNaamOnly')) {
                                 <td class="text-end"><?= htmlspecialchars($fractiegrootte) ?></td>
                                 <td class="text-end text-success"><?= htmlspecialchars((string)($row['voor_count'] ?? '0')) ?></td>
                                 <td class="text-end text-danger"><?= htmlspecialchars((string)($row['tegen_count'] ?? '0')) ?></td>
-                                <td class="text-end text-muted"><?= htmlspecialchars((string)($row['anders_count'] ?? '0')) ?></td>
+                                <td class="text-end text-secondary"><?= htmlspecialchars((string)($row['onthouden_count'] ?? '0')) ?></td>
+                                <td class="text-end text-muted"><?= htmlspecialchars((string)($row['absent_count'] ?? '0')) ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -458,67 +501,89 @@ if (!function_exists('renderBesluitPersoonNaamOnly')) {
         }
     }
 
+    if (!function_exists('normalizeBesluitStemmingssoort')) {
+        function normalizeBesluitStemmingssoort(?string $stemmingssoort): string
+        {
+            return trim(mb_strtolower((string)$stemmingssoort));
+        }
+    }
+
     if (!function_exists('renderBesluitStemmingenSection')) {
         function renderBesluitStemmingenSection(
+            ?string $stemmingssoort,
             array $stemmingRows = [],
             array $fractieStemSamenvattingRows = []
         ): void 
         {
-            if (empty($stemmingRows) && empty($fractieStemSamenvattingRows)) {
+            $normalizedStemmingssoort = normalizeBesluitStemmingssoort($stemmingssoort);
+
+            if ($normalizedStemmingssoort === '' || $normalizedStemmingssoort === 'zonder stemming') {
                 return;
-            } 
+            }
+
+            if ($normalizedStemmingssoort === 'met handopsteken' && empty($fractieStemSamenvattingRows)) {
+                return;
+            }
+
+            if ($normalizedStemmingssoort === 'hoofdelijk' && empty($stemmingRows) && empty($fractieStemSamenvattingRows)) {
+                return;
+            }
             ?>
             <div class="card border-0 bg-light mt-4">
                 <div class="card-header bg-transparent">
                     <h5 class="mb-0">Stemmingen</h5>
                 </div>
                 <div class="card-body">
-                    <ul class="nav nav-tabs mb-3" id="stemmingTab" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button
-                                class="nav-link active"
-                                id="persoonlijk-tab"
-                                data-bs-toggle="tab"
-                                data-bs-target="#persoonlijk-pane"
-                                type="button"
-                                role="tab"
-                            >
-                                Persoonlijk
-                            </button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button
-                                class="nav-link"
-                                id="fractie-tab"
-                                data-bs-toggle="tab"
-                                data-bs-target="#fractie-pane"
-                                type="button"
-                                role="tab"
-                            >
-                                Fractie
-                            </button>
-                        </li>
-                    </ul>
+                    <?php if ($normalizedStemmingssoort === 'met handopsteken'): ?>
+                        <?php renderBesluitFractieStemmenTab($fractieStemSamenvattingRows); ?>
+                    <?php else: ?>
+                        <ul class="nav nav-tabs mb-3" id="stemmingTab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button
+                                    class="nav-link active"
+                                    id="persoonlijk-tab"
+                                    data-bs-toggle="tab"
+                                    data-bs-target="#persoonlijk-pane"
+                                    type="button"
+                                    role="tab"
+                                >
+                                    Persoonlijk
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button
+                                    class="nav-link"
+                                    id="fractie-tab"
+                                    data-bs-toggle="tab"
+                                    data-bs-target="#fractie-pane"
+                                    type="button"
+                                    role="tab"
+                                >
+                                    Fractie
+                                </button>
+                            </li>
+                        </ul>
 
-                    <div class="tab-content">
-                        <div
-                            class="tab-pane fade show active"
-                            id="persoonlijk-pane"
-                            role="tabpanel"
-                            aria-labelledby="persoonlijk-tab"
-                        >
-                            <?php renderBesluitPersoonlijkStemmenTab($stemmingRows); ?>
-                        </div>
+                        <div class="tab-content">
+                            <div
+                                class="tab-pane fade show active"
+                                id="persoonlijk-pane"
+                                role="tabpanel"
+                                aria-labelledby="persoonlijk-tab"
+                            >
+                                <?php renderBesluitPersoonlijkStemmenTab($stemmingRows); ?>
+                            </div>
 
-                        <div
-                            class="tab-pane fade"
-                            id="fractie-pane"
-                            role="tabpanel"
-                            aria-labelledby="fractie-tab"
-                        >
-                            <?php renderBesluitFractieStemmenTab($fractieStemSamenvattingRows); ?>
+                            <div
+                                class="tab-pane fade"
+                                id="fractie-pane"
+                                role="tabpanel"
+                                aria-labelledby="fractie-tab"
+                            >
+                                <?php renderBesluitFractieStemmenTab($fractieStemSamenvattingRows); ?>
+                            </div>
                         </div>
-                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php

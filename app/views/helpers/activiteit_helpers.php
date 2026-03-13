@@ -276,6 +276,7 @@ if (!function_exists('renderActiviteitDetails')) {
                                     <th class="text-end">Einde</th>
                                     <th>Rubriek</th>
                                     <th>Status</th>
+                                    <th class="text-center">Details</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -287,7 +288,7 @@ if (!function_exists('renderActiviteitDetails')) {
                                         <td>
                                             <div><?= htmlspecialchars((string)($agendapunt['onderwerp'] ?? '')) ?></div>
                                             <?php if (!empty($agendapunt['noot'])): ?>
-                                                <div class="small text-muted mt-1">
+                                                <div class="small text-muted mt-1 text-truncate" style="max-width: 32rem;" title="<?= htmlspecialchars((string)$agendapunt['noot']) ?>">
                                                     <?= htmlspecialchars((string)$agendapunt['noot']) ?>
                                                 </div>
                                             <?php endif; ?>
@@ -300,6 +301,15 @@ if (!function_exists('renderActiviteitDetails')) {
                                         </td>
                                         <td><?= htmlspecialchars((string)($agendapunt['rubriek'] ?? '')) ?></td>
                                         <td><?= htmlspecialchars((string)($agendapunt['status'] ?? '')) ?></td>
+                                        <td class="text-center">
+                                            <a
+                                                href="agendapuntdetails.php?id=<?= urlencode((string)($agendapunt['id'] ?? '')) ?>"
+                                                class="btn btn-sm btn-outline-primary"
+                                                title="Bekijk agendapunt"
+                                            >
+                                                <i class="fa-solid fa-eye"></i>
+                                            </a>
+                                        </td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>

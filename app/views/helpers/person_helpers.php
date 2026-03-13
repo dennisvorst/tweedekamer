@@ -45,6 +45,68 @@ function renderValueRow(string $label, mixed $value): void
     <?php
 }
 
+function personGenderIconClass(?string $geslacht): string
+{
+    $normalized = mb_strtolower(trim((string)$geslacht));
+
+    return match ($normalized) {
+        'man' => 'fa-solid fa-mars',
+        'vrouw' => 'fa-solid fa-venus',
+        'x', 'anders', 'non-binair', 'non-binary' => 'fa-solid fa-genderless',
+        default => 'fa-solid fa-question',
+    };
+}
+
+function personGenderColor(?string $geslacht): string
+{
+    $normalized = mb_strtolower(trim((string)$geslacht));
+
+    return match ($normalized) {
+        'man' => '#2563eb',
+        'vrouw' => '#d81b60',
+        'x', 'anders', 'non-binair', 'non-binary' => '#0f766e',
+        default => '#6b7280',
+    };
+}
+
+function renderPersonGender(?string $geslacht): string
+{
+    if (!hasValue($geslacht)) {
+        return '';
+    }
+
+    $iconClass = personGenderIconClass($geslacht);
+    $color = personGenderColor($geslacht);
+    $label = htmlspecialchars((string)$geslacht);
+
+    return sprintf(
+        '<span title="%s"><i class="%s me-1" style="color: %s;" aria-hidden="true"></i>%s</span>',
+        $label,
+        htmlspecialchars($iconClass),
+        htmlspecialchars($color),
+        $label
+    );
+}
+
+function renderPersonGenderIconOnly(?string $geslacht): string
+{
+    if (!hasValue($geslacht)) {
+        return '';
+    }
+
+    $iconClass = personGenderIconClass($geslacht);
+    $color = personGenderColor($geslacht);
+    $label = htmlspecialchars((string)$geslacht);
+
+    return sprintf(
+        '<span title="%s" aria-label="%s"><i class="%s" style="color: %s;" aria-hidden="true"></i></span>',
+        $label,
+        $label,
+        htmlspecialchars($iconClass),
+        htmlspecialchars($color)
+    );
+}
+
 function renderContactIconLink(
     string $iconClass,
     ?string $href,
@@ -256,7 +318,6 @@ function renderOnderwijsSection(array $onderwijsRows): void
         <div class="card-body">
             <?php foreach ($onderwijsRows as $opleiding): ?>
                 <?php
-                print_r($opleiding);
                 $opleidingNaam = pickFirstValue($opleiding, ['OpleidingNl', 'opleiding_nl', 'opleiding', 'naam']);
                 $instelling = pickFirstValue($opleiding, ['Instelling', 'instelling']);
                 $plaats = pickFirstValue($opleiding, ['Plaats', 'plaats']);
@@ -845,7 +906,15 @@ function renderPersonDetails(
                             <?php renderValueRow('Voornamen', $voornamen); ?>
                             <?php renderValueRow('Tussenvoegsel', $tussenvoegsel); ?>
                             <?php renderValueRow('Achternaam', $achternaam); ?>
-                            <?php renderValueRow('Geslacht', pickFirstValue($person, ['geslacht', 'Geslacht'])); ?>
+                            <?php
+                            $geslacht = pickFirstValue($person, ['geslacht', 'Geslacht']);
+                            if (hasValue($geslacht)):
+                            ?>
+                                <div class="row py-2 border-bottom">
+                                    <div class="col-sm-4 fw-semibold">Geslacht</div>
+                                    <div class="col-sm-8"><?= renderPersonGender((string)$geslacht) ?></div>
+                                </div>
+                            <?php endif; ?>
                             <?php renderValueRow('Geboortedatum', formatDateValue(pickFirstValue($person, ['geboortedatum', 'Geboortedatum']))); ?>
                             <?php renderValueRow('Geboorteplaats', pickFirstValue($person, ['geboorteplaats', 'Geboorteplaats'])); ?>
                             <?php renderValueRow('Overlijdensdatum', formatDateValue(pickFirstValue($person, ['overlijdensdatum', 'Overlijdensdatum']))); ?>
